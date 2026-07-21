@@ -1,0 +1,17 @@
+{
+	"name": "DS_Snowflake_Config",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_Snowflake_DWH",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "SnowflakeV2Table",
+		"schema": [],
+		"typeProperties": {
+			"schema": "CONFIG_SCHEMA",
+			"table": "INGESTION_CONFIG"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

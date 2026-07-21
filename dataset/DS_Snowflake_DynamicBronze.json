@@ -1,0 +1,31 @@
+{
+	"name": "DS_Snowflake_DynamicBronze",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_Snowflake_DWH",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Param_Schema": {
+				"type": "string"
+			},
+			"Param_Table": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SnowflakeV2Table",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().Param_Schema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().Param_Table",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
