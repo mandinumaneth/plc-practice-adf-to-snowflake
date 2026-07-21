@@ -47,7 +47,8 @@
 						"value": "@activity('Lookup_Active_Tables').output.value",
 						"type": "Expression"
 					},
-					"isSequential": true,
+					"isSequential": false,
+					"batchCount": 10,
 					"activities": [
 						{
 							"name": "Copy_Source_To_Blob",
@@ -55,7 +56,7 @@
 							"dependsOn": [],
 							"policy": {
 								"timeout": "0.12:00:00",
-								"retry": 0,
+								"retry": 2,
 								"retryIntervalInSeconds": 30,
 								"secureOutput": false,
 								"secureInput": false
@@ -160,10 +161,6 @@
 								},
 								"sink": {
 									"type": "SnowflakeV2Sink",
-									"preCopyScript": {
-										"value": "@concat('TRUNCATE TABLE PLC_DWH.BRONZE_LAYER.', item().TARGET_SNOWFLAKE_TABLE, ';')",
-										"type": "Expression"
-									},
 									"importSettings": {
 										"type": "SnowflakeImportCopyCommand"
 									}
@@ -240,7 +237,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "@concat(\n    'CREATE TABLE IF NOT EXISTS PLC_DWH.BRONZE_LAYER.', item().TARGET_SNOWFLAKE_TABLE, ' ',\n    'USING TEMPLATE (',\n        'SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*)) ',\n        'FROM TABLE(',\n            'INFER_SCHEMA(',\n                'LOCATION=>''@PLC_DWH.CONFIG_SCHEMA.AZURE_BLOB_STAGE/', item().SOURCE_DB_NAME, '/', item().SOURCE_SCHEMA_NAME, '/', item().SOURCE_TABLE_NAME, '/'', ',\n                'FILE_FORMAT=>''PLC_DWH.CONFIG_SCHEMA.PARQUET_FORMAT''',\n            ')',\n        ')',\n    ') ',\n    'ENABLE_SCHEMA_EVOLUTION = TRUE;'\n)",
+											"value": "@concat(\n    'CREATE OR REPLACE TABLE PLC_DWH.BRONZE_LAYER.', item().TARGET_SNOWFLAKE_TABLE, ' ',\n    'COPY GRANTS ',\n    'USING TEMPLATE (',\n        'SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*)) ',\n        'FROM TABLE(',\n            'INFER_SCHEMA(',\n                'LOCATION=>''@PLC_DWH.CONFIG_SCHEMA.AZURE_BLOB_STAGE/', item().SOURCE_DB_NAME, '/', item().SOURCE_SCHEMA_NAME, '/', item().SOURCE_TABLE_NAME, '/'', ',\n                'FILE_FORMAT=>''PLC_DWH.CONFIG_SCHEMA.PARQUET_FORMAT''',\n            ')',\n        ')',\n    ') ',\n    'ENABLE_SCHEMA_EVOLUTION = TRUE;'\n)",
 											"type": "Expression"
 										}
 									}
