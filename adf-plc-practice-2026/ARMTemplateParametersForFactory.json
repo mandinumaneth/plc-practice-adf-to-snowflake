@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-plc-practice-2026"
+		},
+		"LS_AzureSQL_Source_password": {
+			"value": ""
+		},
+		"LS_Snowflake_DWH_password": {
+			"value": ""
+		},
+		"LS_AzureBlob_Staging_sasUri": {
+			"value": ""
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_server": {
+			"value": "sqlserver-plc-practice-001.database.windows.net"
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_database": {
+			"value": "@{linkedService().DB_Name}"
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_userName": {
+			"value": "plcadmin"
+		},
+		"LS_Snowflake_DWH_properties_typeProperties_database": {
+			"value": "PLC_DWH"
+		}
+	}
+}

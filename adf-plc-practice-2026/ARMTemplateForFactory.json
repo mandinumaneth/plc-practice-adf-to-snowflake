@@ -1,0 +1,481 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-plc-practice-2026"
+		},
+		"LS_AzureSQL_Source_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'LS_AzureSQL_Source'"
+		},
+		"LS_Snowflake_DWH_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'LS_Snowflake_DWH'"
+		},
+		"LS_AzureBlob_Staging_sasUri": {
+			"type": "secureString",
+			"metadata": "Secure string for 'sasUri' of 'LS_AzureBlob_Staging'"
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sqlserver-plc-practice-001.database.windows.net"
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "@{linkedService().DB_Name}"
+		},
+		"LS_AzureSQL_Source_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "plcadmin"
+		},
+		"LS_Snowflake_DWH_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "PLC_DWH"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Metadata_Driven_Ingestion')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Lookup_Active_Tables",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SnowflakeV2Source",
+								"query": "SELECT SOURCE_DB_NAME, SOURCE_SCHEMA_NAME, SOURCE_TABLE_NAME, TARGET_SNOWFLAKE_SCHEMA, TARGET_SNOWFLAKE_TABLE \nFROM CONFIG_SCHEMA.INGESTION_CONFIG \nWHERE IS_ACTIVE = TRUE;",
+								"exportSettings": {
+									"type": "SnowflakeExportCopyCommand"
+								},
+								"treatDecimalAsString": false
+							},
+							"dataset": {
+								"referenceName": "DS_Snowflake_Config",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "ForEach_Active_Table",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup_Active_Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup_Active_Tables').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy_Source_To_Blob",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_AzureSQL_DynamicSource",
+											"type": "DatasetReference",
+											"parameters": {
+												"Param_DB": {
+													"value": "@item().SOURCE_DB_NAME",
+													"type": "Expression"
+												},
+												"Param_Schema": {
+													"value": "@item().SOURCE_SCHEMA_NAME",
+													"type": "Expression"
+												},
+												"Param_Table": {
+													"value": "@item().SOURCE_TABLE_NAME",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AzureBlob_DynamicStaging",
+											"type": "DatasetReference",
+											"parameters": {
+												"Param_DB": {
+													"value": "@item().SOURCE_DB_NAME",
+													"type": "Expression"
+												},
+												"Param_Schema": {
+													"value": "@item().SOURCE_SCHEMA_NAME",
+													"type": "Expression"
+												},
+												"Param_Table": {
+													"value": "@item().SOURCE_TABLE_NAME",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Copy_Blob_To_Snowflake",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Copy_Source_To_Blob",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "ParquetSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "ParquetReadSettings"
+											}
+										},
+										"sink": {
+											"type": "SnowflakeV2Sink",
+											"importSettings": {
+												"type": "SnowflakeImportCopyCommand"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_AzureBlob_DynamicStaging",
+											"type": "DatasetReference",
+											"parameters": {
+												"Param_DB": "@item().SOURCE_DB_NAME",
+												"Param_Schema": {
+													"value": "@item().SOURCE_SCHEMA_NAME",
+													"type": "Expression"
+												},
+												"Param_Table": {
+													"value": "@item().SOURCE_TABLE_NAME",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_Snowflake_DynamicBronze",
+											"type": "DatasetReference",
+											"parameters": {
+												"Param_Schema": {
+													"value": "@item().TARGET_SNOWFLAKE_SCHEMA",
+													"type": "Expression"
+												},
+												"Param_Table": {
+													"value": "@item().TARGET_SNOWFLAKE_TABLE",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-21T09:24:20Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Snowflake_Config')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AzureSQL_DynamicSource')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AzureBlob_DynamicStaging')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Snowflake_DynamicBronze')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_AzureBlob_DynamicStaging')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureBlob_Staging",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Param_DB": {
+						"type": "string"
+					},
+					"Param_Schema": {
+						"type": "string"
+					},
+					"Param_Table": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@concat(dataset().Param_Table, '.parquet')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat(dataset().Param_DB, '/', dataset().Param_Schema, '/', dataset().Param_Table)",
+							"type": "Expression"
+						},
+						"container": "landing-zone"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureBlob_Staging')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_AzureSQL_DynamicSource')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Source",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DB_Name": {
+							"value": "@dataset().Param_DB",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"Param_DB": {
+						"type": "string"
+					},
+					"Param_Schema": {
+						"type": "string"
+					},
+					"Param_Table": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Param_Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Param_Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Source')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Snowflake_Config')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_Snowflake_DWH",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "SnowflakeV2Table",
+				"schema": [],
+				"typeProperties": {
+					"schema": "CONFIG_SCHEMA",
+					"table": "INGESTION_CONFIG"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_Snowflake_DWH')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Snowflake_DynamicBronze')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_Snowflake_DWH",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Param_Schema": {
+						"type": "string"
+					},
+					"Param_Table": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "SnowflakeV2Table",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Param_Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Param_Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_Snowflake_DWH')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_AzureBlob_Staging')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"sasUri": "[parameters('LS_AzureBlob_Staging_sasUri')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_AzureSQL_Source')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"DB_Name": {
+						"type": "string",
+						"defaultValue": "PLC_LOANS_DB"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('LS_AzureSQL_Source_properties_typeProperties_server')]",
+					"database": "[parameters('LS_AzureSQL_Source_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('LS_AzureSQL_Source_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('LS_AzureSQL_Source_password')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_Snowflake_DWH')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "SnowflakeV2",
+				"typeProperties": {
+					"authenticationType": "Basic",
+					"accountIdentifier": "spgoyum-gq26336",
+					"user": "MMANETH",
+					"database": "[parameters('LS_Snowflake_DWH_properties_typeProperties_database')]",
+					"warehouse": "COMPUTE_WH",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('LS_Snowflake_DWH_password')]"
+					},
+					"useUtcTimestamps": false
+				},
+				"version": "1.1"
+			},
+			"dependsOn": []
+		}
+	]
+}
