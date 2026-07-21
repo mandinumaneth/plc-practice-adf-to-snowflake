@@ -1,5 +1,5 @@
 {
-	"name": "PL_Metadata_Driven_Ingestion",
+	"name": "COPY_PL_Metadata_Driven_Ingestion",
 	"properties": {
 		"activities": [
 			{
@@ -132,7 +132,7 @@
 							"type": "Copy",
 							"dependsOn": [
 								{
-									"activity": "Deploy_And_Evolve_Schema",
+									"activity": "Copy_Source_To_Blob",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -160,10 +160,6 @@
 								},
 								"sink": {
 									"type": "SnowflakeV2Sink",
-									"preCopyScript": {
-										"value": "@concat('TRUNCATE TABLE PLC_DWH.BRONZE_LAYER.', item().TARGET_SNOWFLAKE_TABLE, ';')",
-										"type": "Expression"
-									},
 									"importSettings": {
 										"type": "SnowflakeImportCopyCommand"
 									}
@@ -211,43 +207,6 @@
 									}
 								}
 							]
-						},
-						{
-							"name": "Deploy_And_Evolve_Schema",
-							"type": "Script",
-							"dependsOn": [
-								{
-									"activity": "Copy_Source_To_Blob",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"policy": {
-								"timeout": "0.12:00:00",
-								"retry": 0,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"linkedServiceName": {
-								"referenceName": "LS_Snowflake_DWH",
-								"type": "LinkedServiceReference"
-							},
-							"typeProperties": {
-								"scripts": [
-									{
-										"type": "Query",
-										"text": {
-											"value": "@concat(\n    'CREATE TABLE IF NOT EXISTS PLC_DWH.BRONZE_LAYER.', item().TARGET_SNOWFLAKE_TABLE, ' ',\n    'USING TEMPLATE (',\n        'SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*)) ',\n        'FROM TABLE(',\n            'INFER_SCHEMA(',\n                'LOCATION=>''@PLC_DWH.CONFIG_SCHEMA.AZURE_BLOB_STAGE/', item().SOURCE_DB_NAME, '/', item().SOURCE_SCHEMA_NAME, '/', item().SOURCE_TABLE_NAME, '/'', ',\n                'FILE_FORMAT=>''PLC_DWH.CONFIG_SCHEMA.PARQUET_FORMAT''',\n            ')',\n        ')',\n    ') ',\n    'ENABLE_SCHEMA_EVOLUTION = TRUE;'\n)",
-											"type": "Expression"
-										}
-									}
-								],
-								"scriptBlockExecutionTimeout": "02:00:00",
-								"treatDecimalAsString": false
-							}
 						}
 					]
 				}
