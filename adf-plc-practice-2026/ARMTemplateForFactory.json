@@ -343,7 +343,7 @@
 						}
 					},
 					{
-						"name": "Set_Start_Time",
+						"name": "Set_End_Time",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -352,33 +352,9 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "Var_Watermark_Start",
-							"value": {
-								"value": "@formatDateTime(addDays(utcnow(), -1), 'yyyy-MM-dd 00:00:00')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set_End_Time",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set_Start_Time",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
 							"variableName": "Var_Watermark_End",
 							"value": {
-								"value": "@formatDateTime(utcnow(), 'yyyy-MM-dd HH:mm:ss')",
+								"value": "@formatDateTime(addDays(utcnow(), -1), 'yyyy-MM-dd 23:59:59.999')",
 								"type": "Expression"
 							}
 						}
