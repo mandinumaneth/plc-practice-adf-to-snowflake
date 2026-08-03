@@ -316,7 +316,7 @@
 			},
 			{
 				"name": "Trigger_Silver_Curation",
-				"type": "SqlServerStoredProcedure",
+				"type": "Script",
 				"dependsOn": [
 					{
 						"activity": "ForEach_Active_Table",
@@ -332,7 +332,24 @@
 					"secureOutput": false,
 					"secureInput": false
 				},
-				"userProperties": []
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "LS_Snowflake_DWH",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "@concat('CALL PLC_DWH.CONFIG_SCHEMA.SP_MAIN_SILVER_CURATION(''', pipeline().RunId, ''')')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00",
+					"treatDecimalAsString": false
+				}
 			}
 		],
 		"variables": {
