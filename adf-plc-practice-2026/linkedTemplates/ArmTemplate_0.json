@@ -565,6 +565,43 @@
 								"type": "Expression"
 							}
 						}
+					},
+					{
+						"name": "Trigger_Silver_Curation",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "ForEach_Active_Table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "LS_Snowflake_DWH",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "@concat('CALL PLC_DWH.CONFIG_SCHEMA.SP_MAIN_SILVER_CURATION(''', pipeline().RunId, ''')')",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00",
+							"treatDecimalAsString": false
+						}
 					}
 				],
 				"policy": {
@@ -583,10 +620,10 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_Snowflake_Config')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_Snowflake_DWH')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AzureSQL_DynamicSource')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AzureBlob_DynamicStaging')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Snowflake_DynamicBronze')]",
-				"[concat(variables('factoryId'), '/linkedServices/LS_Snowflake_DWH')]"
+				"[concat(variables('factoryId'), '/datasets/DS_Snowflake_DynamicBronze')]"
 			]
 		}
 	]
